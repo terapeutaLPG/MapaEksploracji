@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "867433584950",
+    "project_id": "mapaeksploracji",
+    "storage_bucket": "mapaeksploracji.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:867433584950:android:04a035a18d6fea50663b97",
+        "android_client_info": {
+          "package_name": "com.example.mapaeksploracji"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqOPqDfN21Gitevo7Uqp3DYR2yJIqvFmI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
