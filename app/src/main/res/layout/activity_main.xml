@@ -8,4 +8,46 @@
         android:id="@+id/mapView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
+
+    <!-- Joystick -->
+    <LinearLayout
+        android:id="@+id/joystick"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <Button
+            android:id="@+id/btnUp"
+            android:text="↑"
+            android:layout_width="64dp"
+            android:layout_height="64dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btnLeft"
+                android:text="←"
+                android:layout_width="64dp"
+                android:layout_height="64dp" />
+            <Space
+                android:layout_width="16dp"
+                android:layout_height="64dp" />
+            <Button
+                android:id="@+id/btnRight"
+                android:text="→"
+                android:layout_width="64dp"
+                android:layout_height="64dp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnDown"
+            android:text="↓"
+            android:layout_width="64dp"
+            android:layout_height="64dp" />
+    </LinearLayout>
+
 </FrameLayout>

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.widget.Button
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -24,6 +25,11 @@ import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListen
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.android.gestures.MoveGestureDetector
+import com.mapbox.maps.extension.style.layers.addLayerBelow
+import com.mapbox.maps.extension.style.layers.generated.RasterLayer
+import com.mapbox.maps.extension.style.sources.TileSet
+import com.mapbox.maps.extension.style.sources.addSource
+import com.mapbox.maps.extension.style.sources.generated.RasterSource
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mapView: MapView
@@ -45,11 +51,67 @@ class MainActivity : AppCompatActivity() {
 
         FirebaseApp.initializeApp(this)
         mapView = findViewById(R.id.mapView)
+        findViewById<Button>(R.id.btnUp).setOnClickListener { moveCamera(0.001, 0.0) }
+        findViewById<Button>(R.id.btnDown).setOnClickListener { moveCamera(-0.001, 0.0) }
+        findViewById<Button>(R.id.btnLeft).setOnClickListener { moveCamera(0.0, -0.001) }
+        findViewById<Button>(R.id.btnRight).setOnClickListener { moveCamera(0.0, 0.001) }
 
-        mapView.getMapboxMap().loadStyleUri(Style.DARK) {
+
+        mapView.getMapboxMap().loadStyleUri(Style.LIGHT) { style ->
             checkLocationPermission()
-            loadVisitedSectors()
+            addSatelliteOverlayForVisitedAreas(style)
         }
+
+    }
+    private fun moveCamera(dLat: Double, dLng: Double) {
+        val currentCenter = mapView.getMapboxMap().cameraState.center
+        val newLat = currentCenter.latitude() + dLat
+        val newLng = currentCenter.longitude() + dLng
+        val newPoint = Point.fromLngLat(newLng, newLat)
+
+        mapView.getMapboxMap().setCamera(
+            CameraOptions.Builder()
+                .center(newPoint)
+                .build()
+        )
+
+        // Możesz też wywołać zapis do Firebase
+        val roundedLat = (newLat * 1000).toInt() / 1000.0
+        val roundedLng = (newLng * 1000).toInt() / 1000.0
+        val sectorId = "$roundedLat:$roundedLng"
+        val data = hashMapOf("lat" to roundedLat, "lng" to roundedLng)
+
+        Firebase.firestore.collection("visitedAreas").document(sectorId).set(data)
+    }
+
+    private fun addSatelliteOverlayForVisitedAreas(style: Style) {
+        val db = Firebase.firestore
+        db.collection("visitedAreas").get()
+            .addOnSuccessListener { documents ->
+                for (doc in documents) {
+                    val lat = doc.getDouble("lat")
+                    val lng = doc.getDouble("lng")
+                    if (lat != null && lng != null) {
+                        val tileId = "${lat}_${lng}"
+
+                        style.addSource(
+                            RasterSource.Builder(tileId)
+                                .tileSet(
+                                    TileSet.Builder("tileset", listOf(
+                                        "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=YOUR_MAPBOX_TOKEN"
+                                    )).build()
+                                )
+                                .tileSize(256)
+                                .build()
+                        )
+
+                        style.addLayerBelow(
+                            RasterLayer("${tileId}_layer", tileId),
+                            "water" // lub inna warstwa referencyjna
+                        )
+                    }
+                }
+            }
     }
 
     private fun checkLocationPermission() {
