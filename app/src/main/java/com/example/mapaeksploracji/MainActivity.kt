@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Button
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -24,11 +25,14 @@ import com.mapbox.maps.plugin.annotation.generated.createCircleAnnotationManager
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.gestures.gestures
+import com.mapbox.maps.plugin.gestures.OnMoveListener
 import com.mapbox.android.gestures.MoveGestureDetector
+import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.addLayerAbove
 import com.mapbox.maps.extension.style.layers.generated.rasterLayer
 import com.mapbox.maps.extension.style.sources.addSource
-import com.mapbox.maps.extension.style.sources.generated.rasterSource
+import com.mapbox.maps.extension.style.sources.generated.imageSource
+import com.mapbox.maps.extension.style.layers.properties.generated.Visibility
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mapView: MapView
@@ -39,9 +43,7 @@ class MainActivity : AppCompatActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            enableUserLocation()
-        }
+        if (isGranted) enableUserLocation()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,32 +89,44 @@ class MainActivity : AppCompatActivity() {
             .addOnSuccessListener { documents ->
                 mapView.getMapboxMap().getStyle { style ->
                     for (doc in documents) {
-                        val lat = doc.getDouble("lat")
-                        val lng = doc.getDouble("lng")
-                        if (lat != null && lng != null) {
-                            val id = "satellite_${lat}_${lng}"
-                            val delta = 0.000045  // ~5 metrów
-                            val bounds = listOf(
-                                lng - delta, lat - delta,
-                                lng + delta, lat + delta
-                            )
+                        val lat = doc.getDouble("lat") ?: continue
+                        val lng = doc.getDouble("lng") ?: continue
+                        val id = "image-source-$lat-$lng"
+
+                        val delta = 0.00005 // ~5m w każdą stronę
+
+                        val bounds = listOf(
+                            listOf(lng - delta, lat - delta), // SW
+                            listOf(lng + delta, lat - delta), // SE
+                            listOf(lng + delta, lat + delta), // NE
+                            listOf(lng - delta, lat + delta)  // NW
+                        )
+
+                        val imageUrl =
+                            "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/$lng,$lat,18/256x256?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw"
+
+                        val source = imageSource(id) {
+                            coordinates(bounds)
+                            url(imageUrl)
+                        }
+
+                        val layer = rasterLayer("${id}_layer", id) {
+                            rasterOpacity(1.0)
+                            visibility(Visibility.VISIBLE)
+                        }
 
 
+                        Log.d("MapaEksploracji", "Dodaję nakładkę dla $lat, $lng")
+                        Log.d("OverlayDebug", "Dodaję obraz dla $lat, $lng -> $imageUrl")
 
-                            val source = rasterSource(id) {
-                                tileSet("tileset", listOf("https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw")) {
-                                    bounds(bounds)
-                                }
-                                tileSize(256)
-                            }
-
-                            val layer = rasterLayer("${id}_layer", id) {
-                                rasterOpacity(1.0)
-                            }
-
+                        if (!style.styleSourceExists(id)) {
                             style.addSource(source)
+                        }
+                        if (!style.styleLayerExists("${id}_layer")) {
                             style.addLayerAbove(layer, "waterway-label")
                         }
+
+
                     }
                 }
             }
@@ -144,7 +158,7 @@ class MainActivity : AppCompatActivity() {
         var userMovedMap = false
         var lastMoveTime = System.currentTimeMillis()
 
-        mapView.gestures.addOnMoveListener(object : com.mapbox.maps.plugin.gestures.OnMoveListener {
+        mapView.gestures.addOnMoveListener(object : OnMoveListener {
             override fun onMoveBegin(detector: MoveGestureDetector) {
                 userMovedMap = true
                 lastMoveTime = System.currentTimeMillis()

@@ -58,8 +58,6 @@ android {
 
 dependencies {
     implementation("com.google.android.gms:play-services-location:21.0.1")
-    implementation("com.mapbox.maps:android:10.15.0")
-
     implementation("com.mapbox.plugin:maps-locationcomponent:10.15.0")
     implementation("com.google.firebase:firebase-firestore-ktx:24.10.0")
     implementation("androidx.core:core-ktx:1.13.1")
