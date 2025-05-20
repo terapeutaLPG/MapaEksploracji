@@ -91,10 +91,13 @@ class MainActivity : AppCompatActivity() {
                         val lng = doc.getDouble("lng")
                         if (lat != null && lng != null) {
                             val id = "satellite_${lat}_${lng}"
+                            val delta = 0.000045  // ~5 metrów
                             val bounds = listOf(
-                                lng - 0.0005, lat - 0.0005,
-                                lng + 0.0005, lat + 0.0005
+                                lng - delta, lat - delta,
+                                lng + delta, lat + delta
                             )
+
+
 
                             val source = rasterSource(id) {
                                 tileSet("tileset", listOf("https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw")) {
