@@ -1,9 +1,11 @@
 // build.gradle.kts (app)
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
 }
+val MAPBOX_DOWNLOADS_TOKEN: String by project
 
 
 // dalej kod android { ... } i dependencies { ... }
@@ -11,12 +13,12 @@ plugins {
 
 android {
     namespace = "com.example.mapaeksploracji"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.example.mapaeksploracji"
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -60,6 +62,8 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.0")
     implementation("androidx.compose.ui:ui:1.6.5")
     implementation("androidx.compose.ui:ui-tooling-preview:1.6.5")
+    implementation("com.mapbox.maps:android:10.15.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.compose.material3:material3:1.2.1")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
@@ -67,6 +71,7 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.6.5")
     debugImplementation("androidx.compose.ui:ui-tooling:1.6.5")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.6.5")
+
 
     // FIREBASE FIRESTORE:
     implementation("com.google.firebase:firebase-firestore-ktx:24.9.1")

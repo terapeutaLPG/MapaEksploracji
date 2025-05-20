@@ -36,13 +36,36 @@ pluginManagement {
     }
 }
 
+//dependencyResolutionManagement {
+//    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+//    repositories {
+//        google()
+//        mavenCentral()
+//        maven {
+//            url = uri("https://api.mapbox.com/downloads/v2/releases/maven")
+//            credentials {
+//                username = "mapbox"
+//                password = System.getenv("MAPBOX_DOWNLOADS_TOKEN") ?: "<pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw>"
+//            }
+//        }
+//    }
+//}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
+        maven {
+            url = uri("https://api.mapbox.com/downloads/v2/releases/maven")
+            credentials {
+                username = "mapbox"
+                password = "pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw"
+            }
+        }
     }
 }
+
 
 rootProject.name = "MapaEksploracji"
 include(":app")
