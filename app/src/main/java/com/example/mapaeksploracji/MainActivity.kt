@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Button
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -93,13 +94,13 @@ class MainActivity : AppCompatActivity() {
                         val lng = doc.getDouble("lng") ?: continue
                         val id = "image-source-$lat-$lng"
 
-                        val delta = 0.00005 // ~5m w każdą stronę
+                        val delta = 0.0002 // ~20 m w każdą stronę
 
                         val bounds = listOf(
-                            listOf(lng - delta, lat - delta), // SW
-                            listOf(lng + delta, lat - delta), // SE
-                            listOf(lng + delta, lat + delta), // NE
-                            listOf(lng - delta, lat + delta)  // NW
+                            listOf(lng - delta, lat - delta),
+                            listOf(lng + delta, lat - delta),
+                            listOf(lng + delta, lat + delta),
+                            listOf(lng - delta, lat + delta)
                         )
 
                         val imageUrl =
@@ -112,9 +113,8 @@ class MainActivity : AppCompatActivity() {
 
                         val layer = rasterLayer("${id}_layer", id) {
                             rasterOpacity(1.0)
-                            visibility(Visibility.VISIBLE)
+                            visibility(Visibility.VISIBLE) // lub visibility("visible")
                         }
-
 
                         Log.d("MapaEksploracji", "Dodaję nakładkę dla $lat, $lng")
                         Log.d("OverlayDebug", "Dodaję obraz dla $lat, $lng -> $imageUrl")
@@ -125,12 +125,14 @@ class MainActivity : AppCompatActivity() {
                         if (!style.styleLayerExists("${id}_layer")) {
                             style.addLayerAbove(layer, "waterway-label")
                         }
-
-
                     }
+
+                    // Dodaj toast z informacją o liczbie dodanych nakładek
+                    Toast.makeText(this, "Dodano ${documents.size()} nakładek", Toast.LENGTH_SHORT).show()
                 }
             }
     }
+
 
     private fun checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
