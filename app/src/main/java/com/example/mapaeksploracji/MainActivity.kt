@@ -106,20 +106,23 @@ class MainActivity : AppCompatActivity() {
                         val lat = doc.getDouble("lat") ?: continue
                         val lng = doc.getDouble("lng") ?: continue
 
-                        val roundedLat = (lat * 100).toInt() / 100.0
-                        val roundedLng = (lng * 100).toInt() / 100.0
+                        val roundedLat = (lat * 500).toInt() / 500.0
+                        val roundedLng = (lng * 500).toInt() / 500.0
+
 
                         val id = "tile_${roundedLat}_${roundedLng}"
-                        val imageUrl = "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/$roundedLng,$roundedLat,20/256x256?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw"
+                        val imageUrl = "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/$roundedLng,$roundedLat,19/256x256?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw"
 
                         val delta = 0.00075 // rozmiar ~150m
 
+                        val offset = 0.000675  // ok. 75 m w każdą stronę
                         val bounds = listOf(
-                            listOf(lng - delta, lat - delta), // SW
-                            listOf(lng + delta, lat - delta), // SE
-                            listOf(lng + delta, lat + delta), // NE
-                            listOf(lng - delta, lat + delta)  // NW
+                            listOf(lng - offset, lat - offset),
+                            listOf(lng + offset, lat - offset),
+                            listOf(lng + offset, lat + offset),
+                            listOf(lng - offset, lat + offset)
                         )
+
 
 
                         if (!style.styleSourceExists(id)) {
