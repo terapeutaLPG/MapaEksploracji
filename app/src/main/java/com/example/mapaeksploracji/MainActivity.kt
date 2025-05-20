@@ -5,41 +5,43 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
+import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import com.mapbox.geojson.Point
 import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
 import com.mapbox.maps.plugin.LocationPuck2D
+import com.mapbox.maps.plugin.annotation.annotations
+import com.mapbox.maps.plugin.annotation.generated.CircleAnnotationOptions
+import com.mapbox.maps.plugin.annotation.generated.createCircleAnnotationManager
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
-import com.google.firebase.FirebaseApp
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
 
 class MainActivity : AppCompatActivity() {
+
     private lateinit var mapView: MapView
+    private var lastSectorId: String? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            enableUserLocation()
-        }
+        if (isGranted) enableUserLocation()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        // Inicjalizacja Firebase
         FirebaseApp.initializeApp(this)
 
         mapView = findViewById(R.id.mapView)
 
-        // Załaduj styl mapy i sprawdź uprawnienia do lokalizacji
         mapView.getMapboxMap().loadStyleUri(Style.DARK) {
             checkLocationPermission()
+            loadVisitedSectors()
         }
     }
 
@@ -54,18 +56,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enableUserLocation() {
-        val locationComponentPlugin = mapView.location
+        val locationComponent = mapView.location
 
-        locationComponentPlugin.updateSettings {
+        locationComponent.updateSettings {
             enabled = true
             pulsingEnabled = true
-            locationPuck = LocationPuck2D()
+            locationPuck = LocationPuck2D(
+                bearingImage = AppCompatResources.getDrawable(
+                    this@MainActivity, com.mapbox.maps.R.drawable.mapbox_user_icon
+                )
+            )
         }
 
-        // Nasłuchiwanie lokalizacji
-        val listener = object : OnIndicatorPositionChangedListener {
+        locationComponent.addOnIndicatorPositionChangedListener(object :
+            OnIndicatorPositionChangedListener {
             override fun onIndicatorPositionChanged(point: Point) {
-                // Przybliż do pozycji
                 mapView.getMapboxMap().setCamera(
                     CameraOptions.Builder()
                         .center(point)
@@ -73,27 +78,49 @@ class MainActivity : AppCompatActivity() {
                         .build()
                 )
 
-                // Zapisz sektor do Firebase
                 val roundedLat = (point.latitude() * 1000).toInt() / 1000.0
                 val roundedLng = (point.longitude() * 1000).toInt() / 1000.0
                 val sectorId = "$roundedLat:$roundedLng"
 
-                val data = hashMapOf("lat" to roundedLat, "lng" to roundedLng)
+                if (sectorId != lastSectorId) {
+                    lastSectorId = sectorId
 
-                Firebase.firestore.collection("visitedAreas").document(sectorId)
-                    .set(data)
-                    .addOnSuccessListener {
-                        println("✅ Zapisano sektor: $sectorId")
-                    }
-                    .addOnFailureListener { e ->
-                        println("❌ Błąd zapisu sektora: $e")
-                    }
+                    val data = hashMapOf("lat" to roundedLat, "lng" to roundedLng)
+                    Firebase.firestore.collection("visitedAreas").document(sectorId).set(data)
 
-                locationComponentPlugin.removeOnIndicatorPositionChangedListener(this)
+                    val annotationApi = mapView.annotations
+                    val circleManager = annotationApi.createCircleAnnotationManager()
+                    val circle = CircleAnnotationOptions()
+                        .withPoint(Point.fromLngLat(roundedLng, roundedLat))
+                        .withCircleRadius(12.0)
+                        .withCircleColor("#0096FF")
+                        .withCircleStrokeWidth(0.0)
+                    circleManager.create(circle)
+                }
             }
-        }
+        })
+    }
 
-        locationComponentPlugin.addOnIndicatorPositionChangedListener(listener)
+    private fun loadVisitedSectors() {
+        val db = Firebase.firestore
+        val annotationApi = mapView.annotations
+        val circleManager = annotationApi.createCircleAnnotationManager()
+
+        db.collection("visitedAreas").get()
+            .addOnSuccessListener { documents ->
+                for (doc in documents) {
+                    val lat = doc.getDouble("lat")
+                    val lng = doc.getDouble("lng")
+                    if (lat != null && lng != null) {
+                        val options = CircleAnnotationOptions()
+                            .withPoint(Point.fromLngLat(lng, lat))
+                            .withCircleRadius(12.0)
+                            .withCircleColor("#0096FF")
+                            .withCircleStrokeWidth(0.0)
+                        circleManager.create(options)
+                    }
+                }
+            }
     }
 
     override fun onStart() {
