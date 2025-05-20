@@ -3,10 +3,12 @@ package com.example.mapaeksploracji
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
+import androidx.appcompat.content.res.AppCompatResources
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -20,23 +22,28 @@ import com.mapbox.maps.plugin.annotation.generated.CircleAnnotationOptions
 import com.mapbox.maps.plugin.annotation.generated.createCircleAnnotationManager
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
+import com.mapbox.maps.plugin.gestures.gestures
+import com.mapbox.android.gestures.MoveGestureDetector
 
 class MainActivity : AppCompatActivity() {
-
     private lateinit var mapView: MapView
+    private val db = Firebase.firestore
     private var lastSectorId: String? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) enableUserLocation()
+        if (isGranted) {
+            enableUserLocation()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        FirebaseApp.initializeApp(this)
 
+        FirebaseApp.initializeApp(this)
         mapView = findViewById(R.id.mapView)
 
         mapView.getMapboxMap().loadStyleUri(Style.DARK) {
@@ -68,25 +75,50 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
+        var userMovedMap = false
+        var lastMoveTime = System.currentTimeMillis()
+
+        mapView.gestures.addOnMoveListener(object : com.mapbox.maps.plugin.gestures.OnMoveListener {
+            override fun onMoveBegin(detector: MoveGestureDetector) {
+                userMovedMap = true
+                lastMoveTime = System.currentTimeMillis()
+            }
+
+            override fun onMove(detector: MoveGestureDetector): Boolean {
+                lastMoveTime = System.currentTimeMillis()
+                return false
+            }
+
+            override fun onMoveEnd(detector: MoveGestureDetector) {
+                lastMoveTime = System.currentTimeMillis()
+                handler.postDelayed({
+                    userMovedMap = false
+                }, 3000)
+            }
+        })
+
         locationComponent.addOnIndicatorPositionChangedListener(object :
             OnIndicatorPositionChangedListener {
             override fun onIndicatorPositionChanged(point: Point) {
-                mapView.getMapboxMap().setCamera(
-                    CameraOptions.Builder()
-                        .center(point)
-                        .zoom(14.0)
-                        .build()
-                )
+                // automatyczne przybliżenie tylko jeśli użytkownik nie przesuwa mapy
+                if (!userMovedMap || System.currentTimeMillis() - lastMoveTime > 3000) {
+                    mapView.getMapboxMap().setCamera(
+                        CameraOptions.Builder()
+                            .center(point)
+                            .zoom(14.0)
+                            .build()
+                    )
+                    userMovedMap = false
+                }
 
+                // zapis sektora
                 val roundedLat = (point.latitude() * 1000).toInt() / 1000.0
                 val roundedLng = (point.longitude() * 1000).toInt() / 1000.0
                 val sectorId = "$roundedLat:$roundedLng"
-
                 if (sectorId != lastSectorId) {
                     lastSectorId = sectorId
-
                     val data = hashMapOf("lat" to roundedLat, "lng" to roundedLng)
-                    Firebase.firestore.collection("visitedAreas").document(sectorId).set(data)
+                    db.collection("visitedAreas").document(sectorId).set(data)
 
                     val annotationApi = mapView.annotations
                     val circleManager = annotationApi.createCircleAnnotationManager()
@@ -102,7 +134,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadVisitedSectors() {
-        val db = Firebase.firestore
         val annotationApi = mapView.annotations
         val circleManager = annotationApi.createCircleAnnotationManager()
 
@@ -117,6 +148,7 @@ class MainActivity : AppCompatActivity() {
                             .withCircleRadius(12.0)
                             .withCircleColor("#0096FF")
                             .withCircleStrokeWidth(0.0)
+
                         circleManager.create(options)
                     }
                 }
