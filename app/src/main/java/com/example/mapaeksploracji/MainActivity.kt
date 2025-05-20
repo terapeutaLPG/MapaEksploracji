@@ -1,43 +1,3 @@
-//
-//package com.example.mapaeksploracji
-//
-//import android.os.Bundle
-//import androidx.appcompat.app.AppCompatActivity
-//import com.mapbox.maps.MapView
-//import com.mapbox.maps.Style
-//
-//class MainActivity : AppCompatActivity() {
-//    private lateinit var mapView: MapView
-//
-//    override fun onCreate(savedInstanceState: Bundle?) {
-//        super.onCreate(savedInstanceState)
-//        setContentView(R.layout.activity_main)
-//
-//        mapView = findViewById(R.id.mapView)
-//
-//        mapView.getMapboxMap().loadStyleUri(Style.DARK) // zmień na Style.LIGHT albo custom, jeśli chcesz
-//    }
-//
-//    override fun onStart() {
-//        super.onStart()
-//        mapView.onStart()
-//    }
-//
-//    override fun onStop() {
-//        super.onStop()
-//        mapView.onStop()
-//    }
-//
-//    override fun onLowMemory() {
-//        super.onLowMemory()
-//        mapView.onLowMemory()
-//    }
-//
-//    override fun onDestroy() {
-//        super.onDestroy()
-//        mapView.onDestroy()
-//    }
-//}
 package com.example.mapaeksploracji
 
 import android.Manifest
@@ -46,18 +6,17 @@ import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.mapbox.geojson.Point
+import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
 import com.mapbox.maps.plugin.LocationPuck2D
+import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
-import com.mapbox.maps.plugin.locationcomponent.location2
-import com.mapbox.maps.plugin.locationcomponent.LocationComponentPlugin
-
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mapView: MapView
 
-    // Launcher do żądania uprawnień
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -95,6 +54,21 @@ class MainActivity : AppCompatActivity() {
             pulsingEnabled = true
             locationPuck = LocationPuck2D()
         }
+
+        // Przybliż do aktualnej lokalizacji
+        val listener = object : OnIndicatorPositionChangedListener {
+            override fun onIndicatorPositionChanged(point: Point) {
+                mapView.getMapboxMap().setCamera(
+                    CameraOptions.Builder()
+                        .center(point)
+                        .zoom(14.0)
+                        .build()
+                )
+                locationComponentPlugin.removeOnIndicatorPositionChangedListener(this)
+            }
+        }
+
+        locationComponentPlugin.addOnIndicatorPositionChangedListener(listener)
     }
 
     override fun onStart() {
