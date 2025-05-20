@@ -57,9 +57,9 @@ android {
 }
 
 dependencies {
-   
-    implementation("com.mapbox.plugin:maps-locationcomponent:10.15.0")
 
+    implementation("com.mapbox.plugin:maps-locationcomponent:10.15.0")
+    implementation("com.google.firebase:firebase-firestore-ktx:24.10.0")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.9.0")
@@ -79,3 +79,4 @@ dependencies {
     // FIREBASE FIRESTORE:
     implementation("com.google.firebase:firebase-firestore-ktx:24.9.1")
 }
+apply(plugin = "com.google.gms.google-services")

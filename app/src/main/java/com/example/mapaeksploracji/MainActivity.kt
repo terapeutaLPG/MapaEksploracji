@@ -13,6 +13,9 @@ import com.mapbox.maps.Style
 import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
+import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mapView: MapView
@@ -29,8 +32,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Inicjalizacja Firebase
+        FirebaseApp.initializeApp(this)
+
         mapView = findViewById(R.id.mapView)
 
+        // Załaduj styl mapy i sprawdź uprawnienia do lokalizacji
         mapView.getMapboxMap().loadStyleUri(Style.DARK) {
             checkLocationPermission()
         }
@@ -55,15 +62,33 @@ class MainActivity : AppCompatActivity() {
             locationPuck = LocationPuck2D()
         }
 
-        // Przybliż do aktualnej lokalizacji
+        // Nasłuchiwanie lokalizacji
         val listener = object : OnIndicatorPositionChangedListener {
             override fun onIndicatorPositionChanged(point: Point) {
+                // Przybliż do pozycji
                 mapView.getMapboxMap().setCamera(
                     CameraOptions.Builder()
                         .center(point)
                         .zoom(14.0)
                         .build()
                 )
+
+                // Zapisz sektor do Firebase
+                val roundedLat = (point.latitude() * 1000).toInt() / 1000.0
+                val roundedLng = (point.longitude() * 1000).toInt() / 1000.0
+                val sectorId = "$roundedLat:$roundedLng"
+
+                val data = hashMapOf("lat" to roundedLat, "lng" to roundedLng)
+
+                Firebase.firestore.collection("visitedAreas").document(sectorId)
+                    .set(data)
+                    .addOnSuccessListener {
+                        println("✅ Zapisano sektor: $sectorId")
+                    }
+                    .addOnFailureListener { e ->
+                        println("❌ Błąd zapisu sektora: $e")
+                    }
+
                 locationComponentPlugin.removeOnIndicatorPositionChangedListener(this)
             }
         }
