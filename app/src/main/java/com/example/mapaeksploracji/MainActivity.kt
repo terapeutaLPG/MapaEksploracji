@@ -25,11 +25,10 @@ import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListen
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.android.gestures.MoveGestureDetector
-import com.mapbox.maps.extension.style.layers.addLayerBelow
-import com.mapbox.maps.extension.style.layers.generated.RasterLayer
-import com.mapbox.maps.extension.style.sources.TileSet
+import com.mapbox.maps.extension.style.layers.addLayerAbove
+import com.mapbox.maps.extension.style.layers.generated.rasterLayer
 import com.mapbox.maps.extension.style.sources.addSource
-import com.mapbox.maps.extension.style.sources.generated.RasterSource
+import com.mapbox.maps.extension.style.sources.generated.rasterSource
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mapView: MapView
@@ -51,18 +50,18 @@ class MainActivity : AppCompatActivity() {
 
         FirebaseApp.initializeApp(this)
         mapView = findViewById(R.id.mapView)
+
         findViewById<Button>(R.id.btnUp).setOnClickListener { moveCamera(0.001, 0.0) }
         findViewById<Button>(R.id.btnDown).setOnClickListener { moveCamera(-0.001, 0.0) }
         findViewById<Button>(R.id.btnLeft).setOnClickListener { moveCamera(0.0, -0.001) }
         findViewById<Button>(R.id.btnRight).setOnClickListener { moveCamera(0.0, 0.001) }
 
-
         mapView.getMapboxMap().loadStyleUri(Style.LIGHT) { style ->
             checkLocationPermission()
-            addSatelliteOverlayForVisitedAreas(style)
+            addSatelliteOverlayForVisitedAreas()
         }
-
     }
+
     private fun moveCamera(dLat: Double, dLng: Double) {
         val currentCenter = mapView.getMapboxMap().cameraState.center
         val newLat = currentCenter.latitude() + dLat
@@ -75,40 +74,42 @@ class MainActivity : AppCompatActivity() {
                 .build()
         )
 
-        // Możesz też wywołać zapis do Firebase
         val roundedLat = (newLat * 1000).toInt() / 1000.0
         val roundedLng = (newLng * 1000).toInt() / 1000.0
         val sectorId = "$roundedLat:$roundedLng"
         val data = hashMapOf("lat" to roundedLat, "lng" to roundedLng)
 
-        Firebase.firestore.collection("visitedAreas").document(sectorId).set(data)
+        db.collection("visitedAreas").document(sectorId).set(data)
     }
 
-    private fun addSatelliteOverlayForVisitedAreas(style: Style) {
-        val db = Firebase.firestore
+    private fun addSatelliteOverlayForVisitedAreas() {
         db.collection("visitedAreas").get()
             .addOnSuccessListener { documents ->
-                for (doc in documents) {
-                    val lat = doc.getDouble("lat")
-                    val lng = doc.getDouble("lng")
-                    if (lat != null && lng != null) {
-                        val tileId = "${lat}_${lng}"
+                mapView.getMapboxMap().getStyle { style ->
+                    for (doc in documents) {
+                        val lat = doc.getDouble("lat")
+                        val lng = doc.getDouble("lng")
+                        if (lat != null && lng != null) {
+                            val id = "satellite_${lat}_${lng}"
+                            val bounds = listOf(
+                                lng - 0.0005, lat - 0.0005,
+                                lng + 0.0005, lat + 0.0005
+                            )
 
-                        style.addSource(
-                            RasterSource.Builder(tileId)
-                                .tileSet(
-                                    TileSet.Builder("tileset", listOf(
-                                        "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=YOUR_MAPBOX_TOKEN"
-                                    )).build()
-                                )
-                                .tileSize(256)
-                                .build()
-                        )
+                            val source = rasterSource(id) {
+                                tileSet("tileset", listOf("https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw")) {
+                                    bounds(bounds)
+                                }
+                                tileSize(256)
+                            }
 
-                        style.addLayerBelow(
-                            RasterLayer("${tileId}_layer", tileId),
-                            "water" // lub inna warstwa referencyjna
-                        )
+                            val layer = rasterLayer("${id}_layer", id) {
+                                rasterOpacity(1.0)
+                            }
+
+                            style.addSource(source)
+                            style.addLayerAbove(layer, "waterway-label")
+                        }
                     }
                 }
             }
@@ -162,7 +163,6 @@ class MainActivity : AppCompatActivity() {
         locationComponent.addOnIndicatorPositionChangedListener(object :
             OnIndicatorPositionChangedListener {
             override fun onIndicatorPositionChanged(point: Point) {
-                // automatyczne przybliżenie tylko jeśli użytkownik nie przesuwa mapy
                 if (!userMovedMap || System.currentTimeMillis() - lastMoveTime > 3000) {
                     mapView.getMapboxMap().setCamera(
                         CameraOptions.Builder()
@@ -173,48 +173,19 @@ class MainActivity : AppCompatActivity() {
                     userMovedMap = false
                 }
 
-                // zapis sektora
-                val roundedLat = (point.latitude() * 1000).toInt() / 1000.0
-                val roundedLng = (point.longitude() * 1000).toInt() / 1000.0
+                val lat = point.latitude()
+                val lng = point.longitude()
+                val roundedLat = (lat * 1000).toInt() / 1000.0
+                val roundedLng = (lng * 1000).toInt() / 1000.0
                 val sectorId = "$roundedLat:$roundedLng"
+
                 if (sectorId != lastSectorId) {
                     lastSectorId = sectorId
                     val data = hashMapOf("lat" to roundedLat, "lng" to roundedLng)
                     db.collection("visitedAreas").document(sectorId).set(data)
-
-                    val annotationApi = mapView.annotations
-                    val circleManager = annotationApi.createCircleAnnotationManager()
-                    val circle = CircleAnnotationOptions()
-                        .withPoint(Point.fromLngLat(roundedLng, roundedLat))
-                        .withCircleRadius(12.0)
-                        .withCircleColor("#0096FF")
-                        .withCircleStrokeWidth(0.0)
-                    circleManager.create(circle)
                 }
             }
         })
-    }
-
-    private fun loadVisitedSectors() {
-        val annotationApi = mapView.annotations
-        val circleManager = annotationApi.createCircleAnnotationManager()
-
-        db.collection("visitedAreas").get()
-            .addOnSuccessListener { documents ->
-                for (doc in documents) {
-                    val lat = doc.getDouble("lat")
-                    val lng = doc.getDouble("lng")
-                    if (lat != null && lng != null) {
-                        val options = CircleAnnotationOptions()
-                            .withPoint(Point.fromLngLat(lng, lat))
-                            .withCircleRadius(12.0)
-                            .withCircleColor("#0096FF")
-                            .withCircleStrokeWidth(0.0)
-
-                        circleManager.create(options)
-                    }
-                }
-            }
     }
 
     override fun onStart() {
