@@ -74,6 +74,7 @@ class MainActivity : AppCompatActivity() {
         mapView.getMapboxMap().loadStyleUri(Style.LIGHT) { style ->
             checkLocationPermission()
             addSatelliteOverlayForVisitedAreas()
+
         }
     }
 
@@ -102,49 +103,46 @@ class MainActivity : AppCompatActivity() {
             .addOnSuccessListener { documents ->
                 mapView.getMapboxMap().getStyle { style ->
                     for (doc in documents) {
-                        val baseLat = doc.getDouble("lat") ?: continue
-                        val baseLng = doc.getDouble("lng") ?: continue
+                        val lat = doc.getDouble("lat") ?: continue
+                        val lng = doc.getDouble("lng") ?: continue
 
-                        val step = 0.0005  // ok. 50 metrów
-                        for (latOffset in -1..1) {
-                            for (lngOffset in -1..1) {
-                                val lat = baseLat + latOffset * step
-                                val lng = baseLng + lngOffset * step
+                        val roundedLat = (lat * 100).toInt() / 100.0
+                        val roundedLng = (lng * 100).toInt() / 100.0
 
-                                val latFormatted = String.format("%.4f", lat)
-                                val lngFormatted = String.format("%.4f", lng)
-                                val sourceId = "image-source-${latFormatted}_${lngFormatted}"
-                                val imageUrl = "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/$lngFormatted,$latFormatted,20/256x256?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw"
+                        val id = "tile_${roundedLat}_${roundedLng}"
+                        val imageUrl = "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/$roundedLng,$roundedLat,20/256x256?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw"
 
-                                val delta = 0.00025 // połowa "kafelka"
+                        val delta = 0.00075 // rozmiar ~150m
 
-                                val bounds = listOf(
-                                    listOf(lng - delta, lat + delta), // top-left
-                                    listOf(lng + delta, lat + delta), // top-right
-                                    listOf(lng + delta, lat - delta), // bottom-right
-                                    listOf(lng - delta, lat - delta)  // bottom-left
-                                )
+                        val bounds = listOf(
+                            listOf(lng - delta, lat - delta), // SW
+                            listOf(lng + delta, lat - delta), // SE
+                            listOf(lng + delta, lat + delta), // NE
+                            listOf(lng - delta, lat + delta)  // NW
+                        )
 
-                                val source = imageSource(sourceId) {
-                                    coordinates(bounds)
-                                    url(imageUrl)
-                                }
 
-                                val layer = rasterLayer("${sourceId}_layer", sourceId) {
-                                    rasterOpacity(1.0)
-                                    visibility(Visibility.VISIBLE)
-                                }
-
-                                if (!style.styleSourceExists(sourceId)) style.addSource(source)
-                                if (!style.styleLayerExists("${sourceId}_layer")) style.addLayerAbove(layer, "waterway-label")
-
-                                Log.d("OverlayDebug", "Dodaję obraz dla $lat, $lng -> $imageUrl")
+                        if (!style.styleSourceExists(id)) {
+                            val source = imageSource(id) {
+                                coordinates(bounds)
+                                url(imageUrl)
                             }
+                            val layer = rasterLayer("${id}_layer", id) {
+                                rasterOpacity(1.0)
+                                visibility(Visibility.VISIBLE)
+                            }
+                            style.addSource(source)
+                            style.addLayerAbove(layer, "waterway-label")
+                            Log.d("OverlayDebug", "Dodano kafel $id -> $imageUrl")
                         }
                     }
                 }
             }
     }
+
+
+
+
 
 
     private fun checkLocationPermission() {
