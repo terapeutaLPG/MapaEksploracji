@@ -5,6 +5,7 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+
 // dalej kod android { ... } i dependencies { ... }
 
 
