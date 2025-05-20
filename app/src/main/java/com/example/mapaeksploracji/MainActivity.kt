@@ -7,7 +7,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Button
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -20,15 +19,11 @@ import com.mapbox.maps.CameraOptions
 import com.mapbox.maps.MapView
 import com.mapbox.maps.Style
 import com.mapbox.maps.plugin.LocationPuck2D
-import com.mapbox.maps.plugin.annotation.annotations
-import com.mapbox.maps.plugin.annotation.generated.CircleAnnotationOptions
-import com.mapbox.maps.plugin.annotation.generated.createCircleAnnotationManager
 import com.mapbox.maps.plugin.locationcomponent.OnIndicatorPositionChangedListener
 import com.mapbox.maps.plugin.locationcomponent.location
 import com.mapbox.maps.plugin.gestures.gestures
 import com.mapbox.maps.plugin.gestures.OnMoveListener
 import com.mapbox.android.gestures.MoveGestureDetector
-import com.mapbox.maps.extension.style.layers.addLayer
 import com.mapbox.maps.extension.style.layers.addLayerAbove
 import com.mapbox.maps.extension.style.layers.generated.rasterLayer
 import com.mapbox.maps.extension.style.sources.addSource
@@ -53,6 +48,23 @@ class MainActivity : AppCompatActivity() {
 
         FirebaseApp.initializeApp(this)
         mapView = findViewById(R.id.mapView)
+
+        // 🔍 Ustaw startowy zoom i umożliw bardzo duże przybliżenie
+        mapView.getMapboxMap().setCamera(
+            CameraOptions.Builder()
+                .zoom(22.0)
+                .build()
+        )
+
+        // ✋ Włącz wszystkie gesty
+        mapView.gestures.apply {
+            pinchToZoomEnabled = true
+            doubleTapToZoomInEnabled = true
+            quickZoomEnabled = true
+            scrollEnabled = true
+            rotateEnabled = true
+            pitchEnabled = true
+        }
 
         findViewById<Button>(R.id.btnUp).setOnClickListener { moveCamera(0.001, 0.0) }
         findViewById<Button>(R.id.btnDown).setOnClickListener { moveCamera(-0.001, 0.0) }
@@ -92,19 +104,23 @@ class MainActivity : AppCompatActivity() {
                     for (doc in documents) {
                         val lat = doc.getDouble("lat") ?: continue
                         val lng = doc.getDouble("lng") ?: continue
-                        val id = "image-source-$lat-$lng"
+                        val id = "image-source-${lat}_${lng}"
 
-                        val delta = 0.0002 // ~20 m w każdą stronę
+                        val delta = 0.00008
 
                         val bounds = listOf(
-                            listOf(lng - delta, lat - delta),
-                            listOf(lng + delta, lat - delta),
-                            listOf(lng + delta, lat + delta),
-                            listOf(lng - delta, lat + delta)
+                            listOf(lng - delta, lat - delta), // SW
+                            listOf(lng + delta, lat - delta), // SE
+                            listOf(lng + delta, lat + delta), // NE
+                            listOf(lng - delta, lat + delta)  // NW
                         )
 
-                        val imageUrl =
-                            "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/$lng,$lat,18/256x256?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw"
+                        val latFormatted = String.format("%.4f", lat)
+                        val lngFormatted = String.format("%.4f", lng)
+                        val sourceId = "image-source-${latFormatted}_${lngFormatted}"
+                        val imageUrl = "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/$lngFormatted,$latFormatted,20/256x256?access_token=pk.eyJ1Ijoic2ltb3hrc3kiLCJhIjoiY21hd3hwcnEwMGduZDJqc2U5N3QzczJlbiJ9.wBoenJhdDAtikyW9g3q8mw"
+
+
 
                         val source = imageSource(id) {
                             coordinates(bounds)
@@ -113,26 +129,17 @@ class MainActivity : AppCompatActivity() {
 
                         val layer = rasterLayer("${id}_layer", id) {
                             rasterOpacity(1.0)
-                            visibility(Visibility.VISIBLE) // lub visibility("visible")
+                            visibility(Visibility.VISIBLE)
                         }
 
-                        Log.d("MapaEksploracji", "Dodaję nakładkę dla $lat, $lng")
+                        if (!style.styleSourceExists(id)) style.addSource(source)
+                        if (!style.styleLayerExists("${id}_layer")) style.addLayerAbove(layer, "waterway-label")
+
                         Log.d("OverlayDebug", "Dodaję obraz dla $lat, $lng -> $imageUrl")
-
-                        if (!style.styleSourceExists(id)) {
-                            style.addSource(source)
-                        }
-                        if (!style.styleLayerExists("${id}_layer")) {
-                            style.addLayerAbove(layer, "waterway-label")
-                        }
                     }
-
-                    // Dodaj toast z informacją o liczbie dodanych nakładek
-                    Toast.makeText(this, "Dodano ${documents.size()} nakładek", Toast.LENGTH_SHORT).show()
                 }
             }
     }
-
 
     private fun checkLocationPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
